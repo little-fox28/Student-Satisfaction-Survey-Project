@@ -1,0 +1,21 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.pyc
+*.o
+*.pyd
+*.so
+
+# Environments
+.env
+.venv
+env/
+venv/
+ENV/
+VENV/
+
+# Data files
+data/raw/
+data/processed/
+
+# IDE directories
+.idea/
