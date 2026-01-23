@@ -1,17 +1,19 @@
 # 🚀 FPOLY HCM: Student Satisfaction & Happiness Analytics
 
-## 📝 1. Tổng quan dự án (Project Overview)
 Dự án tập trung xây dựng hệ thống báo cáo tự động nhằm đo lường và phân tích chỉ số **Hạnh phúc (Y)** của sinh viên tại **FPOLY cơ sở HCM**. Hệ thống bóc tách sự ảnh hưởng của các nhóm nhân tố (X) để cung cấp cái nhìn toàn diện về trải nghiệm học đường.
 
+---
 
+## 🎯 1. Tổng quan (Project Overview)
 
-* **🎯 Mục tiêu:** Định lượng hóa mức độ hài lòng của sinh viên để hỗ trợ nhà trường đưa ra các quyết định cải thiện chất lượng.
-* **📊 Phương pháp:** Khảo sát định lượng thông qua **thang đo Likert 5 điểm**.
-* **🛠️ Công nghệ:** Python (Pandas, Numpy), Streamlit, Google Forms API.
+- **Mục tiêu:** Định lượng hóa mức độ hài lòng của sinh viên để hỗ trợ nhà trường đưa ra các quyết định cải thiện chất lượng.
+- **Phương pháp:** Khảo sát định lượng thông qua **thang đo Likert 5 điểm**.
+- **Công nghệ:** Python (Pandas, Numpy), Streamlit, Google Forms API.
 
 ---
 
 ## 🏗️ 2. Cấu trúc thư mục (Project Structure)
+
 ```text
 fpoly-happiness-report/
 ├── data/
@@ -27,37 +29,81 @@ fpoly-happiness-report/
 │   └── DUMMY_DATA_GUIDE.md         # 🧪 Hướng dẫn sử dụng dữ liệu giả lập
 └── requirements.txt                # 📦 Danh sách thư viện Python cần thiết
 ```
+
 ---
 
-## ⚙️ 3. Hướng dẫn Cài đặt và Sử dụng (Setup and Usage Guide)
+## ⚙️ 3. Yêu cầu hệ thống (System Requirements)
 
-### a. Cài đặt các thư viện cần thiết (Install Dependencies)
+### ✅ Yêu cầu chức năng (Functional Requirements)
 
-Để cài đặt tất cả các thư viện Python cần thiết cho dự án, hãy chạy lệnh sau trong terminal từ thư mục gốc của dự án:
+- **Thu thập:** Tích hợp dữ liệu tự động hoặc bán tự động từ Google Form.
+- **Xử lý ETL:**
+    - Tự động lọc bỏ các phản hồi không nghiêm túc qua câu hỏi bẫy (`qc_trap_answer`).
+    - Thực hiện đảo ngược điểm (Reverse Coding) cho các biến tâm lý tiêu cực.
+- **Tính toán:** Tính điểm trung bình (Mean) và độ lệch chuẩn (Std Dev) cho các nhóm chỉ số.
+- **Trực quan:** Hiển thị biểu đồ Radar so sánh 4 nhóm nhân tố X, Boxplot theo GPA và Word Cloud cho ý kiến mở.
 
-```bash
-pip install -r requirements.txt
-```
-*Lưu ý: Bạn nên tạo và kích hoạt một môi trường ảo (virtual environment) trước khi cài đặt để tránh xung đột với các thư viện hệ thống.*
+### ⚙️ Yêu cầu phi chức năng (Non-Functional Requirements)
 
-### b. Chuẩn bị dữ liệu (Data Preparation)
+- **Độ chính xác:** Logic đảo điểm và tính toán chỉ số phải khớp 100% với đặc tả kỹ thuật.
+- **Bảo mật:** Ẩn danh tính sinh viên trong các báo cáo hiển thị.
+- **Tính linh hoạt:** Chuyển đổi dễ dàng giữa dữ liệu Dummy (phát triển) và Production (vận hành thật).
 
-#### Tùy chọn 1: Sử dụng dữ liệu khảo sát thật
-(Mô tả cách lấy dữ liệu thật ở đây)
+---
 
-#### Tùy chọn 2: Tạo dữ liệu giả lập (Generate Dummy Data)
-Trong trường hợp không có dữ liệu thật, dự án cung cấp một script để tạo dữ liệu giả lập cho mục đích phát triển và kiểm thử.
+## 🧪 4. Mô hình dữ liệu (Data Architecture)
 
-**Cách thực hiện:**
+### 🧩 Biến độc lập (Independent Variables - X)
 
-1.  Mở terminal của bạn.
-2.  Đảm bảo đang ở trong thư mục gốc của dự án (`Student_Satisfaction_Survey`).
-3.  Chạy lệnh sau:
+Đo lường các nhân tố tác động qua 4 nhóm chính:
+
+- **Academic (X1):** Chương trình học, áp lực deadline, giảng dạy, LMS.
+- **Environment (X2):** Cơ sở vật chất, dịch vụ tiện ích, văn hóa trường học.
+- **Social (X3):** Quan hệ bạn bè, sự hòa nhập CLB, gia đình.
+- **Finance (X4):** Giá trị học phí, chi phí sinh hoạt, triển vọng nghề nghiệp.
+
+### 🏆 Biến phụ thuộc (Dependent Variable - Y)
+
+- **Happiness Index:** Chỉ số đo lường mức độ hài lòng, niềm vui và ý nghĩa cuộc sống tại FPOLY.
+
+---
+
+## 🛠️ 5. Quy trình xử lý (Technical Workflow)
+
+### 🏗️ Nhiệm vụ Data Engineer (ETL Logic)
+
+- **Lọc dữ liệu:** Loại bỏ bản ghi nếu `qc_trap_answer != 2`.
+- **Đảo ngược điểm:** Áp dụng cho các biến tiêu cực để điểm cao luôn đồng nghĩa với sự tích cực.
+    - `aca_2`: Áp lực nặng nề với Deadline/Lab.
+    - `fin_2`: Lo lắng về gánh nặng chi phí sinh hoạt.
+    - **Công thức:** `$Score_{new} = 6 - Score_{old}$`
+
+### 📊 Nhiệm vụ Data Analyst (Analytics Logic)
+
+- **Thống kê:** Tính Mean cho các nhóm X và chỉ số Y tổng hợp.
+- **Phân đoạn:** So sánh mức độ hạnh phúc giữa các nhóm chuyên ngành, kỳ học và tình trạng cư trú.
+- **NLP:** Xử lý văn bản từ câu hỏi "Điều ước" để tìm ra các insight tiềm ẩn.
+
+---
+
+## 📦 7. Hướng dẫn cài đặt (Quick Start)
+
+1.  **Clone repository:**
     ```bash
-    python src/etl/generate_dummy_data.py
+    git clone https://github.com/fpoly-hcm/happiness-analytics.git
     ```
-**Kết quả:**
-Lệnh này sẽ thực thi script và tạo ra một file `survey_dummy_data.csv` tại đường dẫn `data/raw/survey_dummy_data.csv`. Dữ liệu này đã sẵn sàng để được sử dụng bởi các script phân tích tiếp theo.
+2.  **Cài đặt thư viện:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+3.  **Chạy script xử lý:**
+    ```bash
+    python src/etl_process.py
+    ```
+4.  **Khởi chạy Dashboard:**
+    ```bash
+    streamlit run src/app.py
+    ```
 
------
-Lần cuối cập nhật: 20/01/2026 bởi BLOSSOM TEAM
+---
+*Lần cuối cập nhật: 21/01/2026 bởi BLOSSOM TEAM*

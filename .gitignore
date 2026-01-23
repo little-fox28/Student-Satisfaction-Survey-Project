@@ -19,3 +19,7 @@ data/processed/
 
 # IDE directories
 .idea/
+.vscode/
+
+# Secrects Key
+secrets/
