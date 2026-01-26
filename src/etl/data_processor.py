@@ -45,13 +45,13 @@ class DataProcessor:
             self.data.rename(columns=Config.COLUMN_MAPPING, inplace=True)
 
         # 2. Lọc phản hồi rác (Trap Question) - CỰC KỲ QUAN TRỌNG
-        # if 'qc_trap_answer' in self.data.columns:
-        #     initial_count = len(self.data)
-        #     # Chỉ giữ lại những người chọn đúng số 2
-        #     self.data = self.data[self.data['qc_trap_answer'] == 2].copy()
-        #     removed_count = initial_count - len(self.data)
-        #     if removed_count > 0:
-        #         print(f"🧹 Đã loại bỏ {removed_count} bản ghi vi phạm câu hỏi bẫy.")
+        if 'qc_trap_answer' in self.data.columns:
+            initial_count = len(self.data)
+            # Chỉ giữ lại những người chọn đúng số 2
+            self.data = self.data[self.data['qc_trap_answer'] == 2].copy()
+            removed_count = initial_count - len(self.data)
+            if removed_count > 0:
+                print(f"🧹 Đã loại bỏ {removed_count} bản ghi vi phạm câu hỏi bẫy.")
 
         # 3. Chuyển đổi Timestamp
         if 'timestamp' in self.data.columns:
