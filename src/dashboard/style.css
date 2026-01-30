@@ -1,0 +1,155 @@
+/* Main App Background */
+.stApp {
+    background-color: #f8fafc;
+    /* slate-50 */
+}
+
+/* Sidebar Styling */
+[data-testid="stSidebar"]>div:first-child {
+    background-color: #f1f5f9;
+    /* slate-100 */
+    border-right: 1px solid #e2e8f0;
+}
+
+.sidebar-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    padding-bottom: 1rem;
+}
+
+.sidebar-title .icon-bg {
+    background-color: #f97316;
+    color: white;
+    padding: 8px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.sidebar-info-box {
+    background-color: #fff7ed;
+    border: 1px solid #fed7aa;
+    border-radius: 8px;
+    padding: 1rem;
+    color: #9a3412;
+    font-size: 0.875rem;
+}
+
+/* KPI Card Styling */
+.kpi-card {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+}
+
+.kpi-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    font-size: 0.875rem;
+    color: #64748b;
+    font-weight: 500;
+}
+
+.kpi-value {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: #1e293b;
+    display: flex;
+    align-items: center;
+}
+
+.kpi-value .red-text {
+    color: #dc2626;
+}
+
+.kpi-subtitle {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-style: italic;
+    margin-top: 0.5rem;
+}
+
+.kpi-trend {
+    font-size: 0.875rem;
+    font-weight: 500;
+    margin-left: 0.75rem;
+}
+
+.kpi-trend.positive {
+    color: #22c55e;
+    /* green-500 */
+}
+
+.kpi-trend.negative {
+    color: #ef4444;
+    /* red-500 */
+}
+
+/* Chart & Section Containers */
+.st-emotion-cache-1ne20ew {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+}
+
+.chart-container {
+    background-color: #ffffff;
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+    border: 1px solid #e2e8f0;
+}
+
+.section-title {
+    font-size: 1.125rem;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 1.5rem;
+    line-height: 1.4;
+}
+
+.section-title .icon {
+    color: #f97316;
+    margin-right: 8px;
+    vertical-align: text-top;
+}
+
+/* NLP Insight Boxes */
+.insight-box {
+    padding: 1rem;
+    border-left-width: 4px;
+    border-radius: 4px;
+}
+
+.insight-box-blue {
+    background-color: #eff6ff;
+    border-color: #3b82f6;
+    color: #1e40af;
+}
+
+.insight-box-green {
+    background-color: #f0fdf4;
+    border-color: #22c55e;
+    color: #166534;
+}
+
+.insight-title {
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 0.8rem;
+}
+
+.section-spacer {
+    height: 2rem;
+}

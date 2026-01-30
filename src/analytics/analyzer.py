@@ -1,7 +1,7 @@
 import pandas as pd
-# For word cloud generation, these libraries would be needed:
-# from wordcloud import WordCloud
-# from underthesea import word_tokenize # For Vietnamese word tokenization
+from underthesea import word_tokenize
+from collections import Counter
+import os
 
 class DataAnalyzer:
     def __init__(self, file_path: str):
@@ -10,10 +10,21 @@ class DataAnalyzer:
         """
         self.df = pd.DataFrame(pd.read_csv(file_path))
         self.report = {}
+        self.stopwords = self._load_stopwords()
+
+    def _load_stopwords(self):
+        """Loads Vietnamese stopwords from a file."""
+        # Correctly resolve path relative to this script's location
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        stopwords_path = os.path.join(current_dir, 'vietnamese_stopwords.txt')
+        if os.path.exists(stopwords_path):
+            with open(stopwords_path, 'r', encoding='utf-8') as f:
+                return set(f.read().splitlines())
+        return set()
 
     def analysis(self):
         """
-        Method chính thực hiện toàn bộ 5 hướng phân tích chiến lược.
+        Method chính thực hiện toàn bộ các hướng phân tích chiến lược.
         """
         print("📊 Đang phân tích các chỉ số hạnh phúc...")
         
@@ -25,6 +36,7 @@ class DataAnalyzer:
         self._calculate_residence_stress_index()        # F. Chỉ số áp lực tài chính theo nơi ở
         self._calculate_correlations()                  # G. Tương quan Pearson
         self._calculate_retention_risk()                # H. Rủi ro bỏ học
+        self._analyze_wishes()                          # I. Phân tích điều ước (NLP)
         
         print("✅ Phân tích hoàn tất.")
         return self.report
@@ -32,7 +44,7 @@ class DataAnalyzer:
     def _calculate_ahs(self):
         """A. Average Happiness Score (AHS)"""
         hap_cols = [c for c in self.df.columns if c.startswith('hap_')]
-        # Tính điểm trung bình của từng SV, sau đó tính trung bình toàn trường
+        if not hap_cols: return
         self.df['individual_ahs'] = self.df[hap_cols].mean(axis=1)
         self.report['ahs_overall'] = round(self.df['individual_ahs'].mean(), 2)
 
@@ -42,18 +54,19 @@ class DataAnalyzer:
             'Academic (X1)': [c for c in self.df.columns if c.startswith('aca_')],
             'Environment (X2)': [c for c in self.df.columns if c.startswith('env_')],
             'Social (X3)': [c for c in self.df.columns if c.startswith('soc_')],
-            'Finance (X4)': [c for c in self.df.columns if c.startswith('fin_') and c != 'fin_living_cost_worry'] # Exclude reverse question
+            'Finance (X4)': [c for c in self.df.columns if c.startswith('fin_') and c != 'fin_living_cost_worry']
         }
         scores = {}
         for name, cols in factors.items():
-            # Tính trung bình cộng của toàn bộ câu hỏi trong nhóm
-            scores[name] = round(self.df[cols].mean(axis=1).mean(), 2) # Calculate mean per row, then mean of that column
+            if cols:
+                scores[name] = round(self.df[cols].mean(axis=1).mean(), 2)
         self.report['factor_scores'] = scores
 
     def _calculate_nhs(self):
         """C. Net Happiness Score (NHS)"""
-        # Promoters (4-5), Detractors (1-2) dựa trên AHS cá nhân
+        if 'individual_ahs' not in self.df.columns: return
         total = len(self.df)
+        if total == 0: return
         promoters = len(self.df[self.df['individual_ahs'] >= 4])
         detractors = len(self.df[self.df['individual_ahs'] <= 2])
         
@@ -66,7 +79,7 @@ class DataAnalyzer:
             semester_happiness = self.df.groupby('dem_semester')['individual_ahs'].mean().sort_index().round(2).to_dict()
             self.report['semester_happiness_curve'] = semester_happiness
         else:
-            self.report['semester_happiness_curve'] = "Missing 'dem_semester' or 'individual_ahs' column for analysis."
+            self.report['semester_happiness_curve'] = {}
 
     def _calculate_gpa_happiness_correlation(self):
         """E. GPA-Happiness Correlation"""
@@ -78,7 +91,7 @@ class DataAnalyzer:
             gpa_happiness = self.df.groupby('gpa_group', observed=False)['individual_ahs'].mean().round(2).to_dict()
             self.report['gpa_happiness_correlation'] = gpa_happiness
         else:
-            self.report['gpa_happiness_correlation'] = "Missing 'dem_gpa' or 'individual_ahs' column for analysis."
+            self.report['gpa_happiness_correlation'] = {}
             
     def _calculate_residence_stress_index(self):
         """F. Residence Stress Index"""
@@ -86,11 +99,15 @@ class DataAnalyzer:
             residence_stress = self.df.groupby('dem_residence')['fin_living_cost_worry'].mean().round(2).to_dict()
             self.report['residence_stress_index'] = residence_stress
         else:
-            self.report['residence_stress_index'] = "Missing 'dem_residence' or 'fin_living_cost_worry' column for analysis."
+            self.report['residence_stress_index'] = {}
 
     def _calculate_correlations(self):
-        """G. Pearson Correlation (r)"""
-        # Tính điểm trung bình từng nhóm X cho mỗi SV để tìm tương quan với Hạnh phúc (Y)
+        """G. Pearson Correlation (r) and Top Correlated Factor"""
+        if 'individual_ahs' not in self.df.columns: 
+            self.report['correlations'] = {}
+            self.report['top_correlated_factor'] = None
+            return
+
         corr_results = {}
         target = self.df['individual_ahs']
         
@@ -102,17 +119,47 @@ class DataAnalyzer:
         }
         
         for name, cols in factor_groups.items():
-            if not self.df[cols].empty:
+            if cols and not self.df[cols].empty:
                 factor_mean = self.df[cols].mean(axis=1)
                 r = factor_mean.corr(target)
                 corr_results[name] = round(r, 2)
-            
+        
         self.report['correlations'] = corr_results
+        
+        if corr_results:
+            top_factor = max(corr_results, key=corr_results.get)
+            self.report['top_correlated_factor'] = top_factor
+        else:
+            self.report['top_correlated_factor'] = None
 
     def _calculate_retention_risk(self):
         """H. Retention Risk Index"""
-        # Dựa trên câu hỏi 'hap_loyalty_choice' (Sẽ chọn lại FPoly)
+        if 'hap_loyalty_choice' not in self.df.columns or len(self.df) == 0:
+            self.report['retention_risk_rate'] = 0
+            return
+            
         risk_count = len(self.df[self.df['hap_loyalty_choice'] <= 2])
         self.report['retention_risk_rate'] = round((risk_count / len(self.df)) * 100, 2)
+
+    def _analyze_wishes(self):
+        """I. Analyze student wishes using NLP."""
+        if 'wish' not in self.df.columns:
+            self.report['wish_analysis'] = {}
+            return
+
+        text = ' '.join(self.df['wish'].dropna().astype(str))
+        if not text.strip():
+            self.report['wish_analysis'] = {}
+            return
+
+        tokens = word_tokenize(text.lower())
+        
+        # Filter out stopwords and non-alpha words
+        filtered_tokens = [token for token in tokens if token.isalpha() and token not in self.stopwords]
+        
+        word_counts = Counter(filtered_tokens)
+        
+        # Get top 5 most common keywords
+        self.report['wish_analysis'] = dict(word_counts.most_common(5))
 
         
