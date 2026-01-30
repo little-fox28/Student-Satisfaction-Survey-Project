@@ -20,9 +20,15 @@ fpoly-happiness-report/
 │   ├── raw/                        # 📁 Dữ liệu thô từ Google Form (CSV)
 │   └── processed/                  # 📁 Dữ liệu đã làm sạch & xử lý đảo điểm
 ├── src/
-│   ├── etl_process.py              # ⚙️ Script lọc Trap & Reverse Coding (DE)
-│   ├── analytics.py                # 📈 Script tính toán chỉ số thống kê (DA)
-│   └── app.py                      # 🌐 Giao diện Dashboard trực quan (Web)
+│   ├── analytics/                  # 📈 Chứa script tính toán chỉ số thống kê (DA)
+│   │   └── analyzer.py
+│   ├── dashboard/                  # 🌐 Chứa giao diện Dashboard trực quan (Web)
+│   │   └── app.py
+│   ├── etl/                        # ⚙️ Chứa script lọc Trap & Reverse Coding (DE)
+│   │   └── processor.py
+│   ├── __init__.py                 # Khởi tạo gói Python
+│   └── config.py                   # Cấu hình dự án (mapping cột, v.v.)
+├── main.ipynb                      # 🧪 Jupyter Notebook để chạy pipeline ETL và phân tích tương tác
 ├── docs/
 │   ├── METADATA.md                 # 📖 Từ điển dữ liệu & Logic xử lý
 │   ├── requirement.md              # 📋 Đặc tả yêu cầu gốc của dự án
@@ -96,14 +102,25 @@ fpoly-happiness-report/
     ```bash
     pip install -r requirements.txt
     ```
-3.  **Chạy script xử lý:**
+3.  **Chuẩn bị dữ liệu:**
+    Đặt file khảo sát thô (CSV) vào `data/raw/fpoly_survey.csv`.
+
+4.  **Khởi chạy Dashboard (Recommended):**
+    Dashboard Streamlit sẽ tự động chạy toàn bộ pipeline ETL và phân tích.
     ```bash
-    python src/etl_process.py
-    ```
-4.  **Khởi chạy Dashboard:**
-    ```bash
-    streamlit run src/app.py
+    streamlit run src/dashboard/app.py
     ```
 
+5.  **Chạy Pipeline tương tác với Jupyter Notebook (Optional):**
+    Để kiểm tra và chạy từng bước ETL và phân tích một cách tương tác:
+    ```bash
+    jupyter lab main.ipynb
+    ```
+    hoặc
+    ```bash
+    jupyter notebook main.ipynb
+    ```
+    Sau đó, bạn có thể chạy các cell trong notebook.
+
 ---
-*Lần cuối cập nhật: 21/01/2026 bởi BLOSSOM TEAM*
+| *Lần cuối cập nhật: 21/01/2026 bởi BLOSSOM TEAM*

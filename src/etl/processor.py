@@ -29,12 +29,12 @@ class DataProcessor:
         self.data = self.data[self.data['attention_check'] == 'Không đồng ý'].copy()
         self.data.drop(columns=['attention_check'], inplace=True)
 
-        # Standardize 'semester'
-        self.data['semester'] = self.data['semester'].apply(lambda x: int(re.search(r'\d+', str(x)).group()) if re.search(r'\d+', str(x)) else None)
+        # Standardize 'dem_semester'
+        self.data['dem_semester'] = self.data['dem_semester'].apply(lambda x: int(re.search(r'\d+', str(x)).group()) if re.search(r'\d+', str(x)) else None)
 
         # Drop rows with no semester
-        self.data.dropna(subset=['semester'], inplace=True)
-        self.data['semester'] = self.data['semester'].astype(int)
+        self.data.dropna(subset=['dem_semester'], inplace=True)
+        self.data['dem_semester'] = self.data['dem_semester'].astype(int)
 
     def _transform_data(self):
         print("🚀 Khởi động quy trình ETL...")
@@ -75,8 +75,8 @@ class DataProcessor:
                 print(f"🔄 Đã đảo ngược điểm cho cột: {col}")
 
         # 6. Chuẩn hóa GPA (Mở lại để phục vụ phân tích DA)
-        # if 'dem_gpa' in self.data.columns and hasattr(Config, 'GPA_MAPPING'):
-        #     self.data['dem_gpa'] = self.data['dem_gpa'].map(Config.GPA_MAPPING)
+        if 'dem_gpa' in self.data.columns and hasattr(Config, 'GPA_MAPPING'):
+            self.data['dem_gpa'] = self.data['dem_gpa'].map(Config.GPA_MAPPING)
 
         # 7. Loại bỏ trùng lặp
         self.data.drop_duplicates(inplace=True)
