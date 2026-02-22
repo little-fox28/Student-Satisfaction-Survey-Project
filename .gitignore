@@ -15,7 +15,7 @@ VENV/
 
 # Data files
 data/raw/fpoly_survey.csv
-data/processed/fpoly_survey_cleaned.csv
+# data/processed/fpoly_survey_cleaned.csv
 
 # IDE directories
 .idea/
