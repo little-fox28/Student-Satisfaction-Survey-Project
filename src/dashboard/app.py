@@ -1,204 +1,219 @@
 import streamlit as st
 import pandas as pd
-import sys
-import os
-from pathlib import Path
-import plotly.graph_objects as go
-from wordcloud import WordCloud
-from underthesea import word_tokenize
 import numpy as np
-from datetime import datetime
-
-# --- Page and Path Configuration ---
-st.set_page_config(
-    page_title="FPOLY Happiness Analytics",
-    page_icon="📊",
-    layout="wide"
-)
-
-# --- Constants ---
-FPOLY_ORANGE = "#f97316"
-
-# --- Asset Loading ---
-def load_css(file_path):
-    with open(file_path) as f:
-        st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-
-load_css("src/dashboard/style.css")
+from pathlib import Path
 
 
-# --- Path & Data Loading ---
-sys.path.append(str(Path(__file__).resolve().parent.parent.parent))
-from src.etl.processor import DataProcessor
+_APP_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _APP_DIR.parent.parent
+_DATA_PATH = _PROJECT_ROOT / "data" / "processed" / "fpoly_survey_processed.csv"
+_CSS_PATH = _APP_DIR / "style.css"
+_ICON_PATH = _APP_DIR.parent / "assets" / "teamlogo.jpg"
+
+# Add project root for imports
+import sys
+sys.path.insert(0, str(_PROJECT_ROOT))
+
+# Import components
+from components.sidebar import render_sidebar
+from components.charts import render_charts
 from src.analytics.analyzer import DataAnalyzer
 
-@st.cache_data
-def load_data():
-    raw_path, processed_path = 'data/raw/fpoly_survey.csv', 'data/processed/fpoly_survey_processed.csv'
-    with st.spinner("🔄 Processing raw survey data..."):
-        if not os.path.exists(raw_path): return None
-        DataProcessor(file_path=raw_path).process(output_path=processed_path)
-        return pd.read_csv(processed_path)
+# --- PAGE CONFIG ---
+st.set_page_config(
+    page_title="BLOSSOM TEAM",
+    page_icon=str(_ICON_PATH) if _ICON_PATH.exists() else None,
+    layout="wide",
+    initial_sidebar_state="auto"
+)
 
-@st.cache_data
-def run_analysis(_df):
-    temp_path = "data/processed/temp_filtered.csv"
-    _df.to_csv(temp_path, index=False)
-    report = DataAnalyzer(file_path=temp_path).analysis()
-    if os.path.exists(temp_path): os.remove(temp_path)
-    return report
+# --- STYLING ---
+def load_css(css_path):
+    """Loads a CSS file and injects it into the Streamlit app."""
+    try:
+        with open(css_path, encoding="utf-8") as f:
+            st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    except FileNotFoundError:
+        st.error(f"CSS file not found: {css_path}")
 
-# --- UI Components ---
-def display_kpis(report):
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.markdown(f'''
-            <div class="kpi-card">
-                <div class="kpi-title"><span>Hạnh phúc trung bình (AHS)</span><span>😊</span></div>
-                <div class="kpi-value">
-                    {report.get("ahs_overall", 0):.2f} / 5.0
-                </div>
-                <div class="kpi-subtitle">Điểm hài lòng chung của sinh viên</div>
-            </div>
-        ''', unsafe_allow_html=True)
-    with col2:
-        st.markdown(f'''
-            <div class="kpi-card">
-                <div class="kpi-title"><span>Chỉ số Hạnh phúc ròng (NHS)</span><span>🎯</span></div>
-                <div class="kpi-value">{report.get("nhs_percentage", 0):.2f}%</div>
-                <div class="kpi-subtitle">Tỷ lệ Promoters - Detractors</div>
-            </div>
-        ''', unsafe_allow_html=True)
-    with col3:
-        st.markdown(f'''
-            <div class="kpi-card">
-                <div class="kpi-title"><span>Rủi ro bỏ học (Retention)</span><span>⚠️</span></div>
-                <div class="kpi-value"><span class="red-text">{report.get("retention_risk_rate", 0):.2f}%</span></div>
-                <div class="kpi-subtitle">Dựa trên ý định chọn lại trường</div>
-            </div>
-        ''', unsafe_allow_html=True)
+load_css(_CSS_PATH)
 
-def display_charts(report):
-    col1, col2 = st.columns(2)
-    with col1:
-        with st.container(border=True):
-            st.markdown('<div class="section-title"><span class="icon">🔍</span> Cân bằng giữa các nhân tố</div>', unsafe_allow_html=True)
-            factor_scores = report.get('factor_scores', {})
-            if factor_scores:
-                labels = [key.split(' ')[0] for key in factor_scores.keys()]
-                values = list(factor_scores.values())
-                fig = go.Figure(go.Scatterpolar(
-                    r=values, theta=labels, fill='toself', name='Satisfaction',
-                    line=dict(color=FPOLY_ORANGE), fillcolor=f'rgba(249, 115, 22, 0.2)'
-                ))
-                fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 5])), showlegend=False, height=300, margin=dict(l=40, r=40, t=40, b=40), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig, use_container_width=True)
-            else: st.warning("No factor scores data.")
 
-    with col2:
-        with st.container(border=True):
-            st.markdown('<div class="section-title"><span class="icon">📊</span> Mức độ tác động lên Hạnh phúc</div>', unsafe_allow_html=True)
-            correlations = report.get('correlations', {})
-            if correlations:
-                corr_df = pd.DataFrame.from_dict(correlations, orient='index', columns=['r']).sort_values(by='r')
-                colors = [FPOLY_ORANGE if val > 0.6 else '#fb923c' for val in corr_df['r']]
-                fig = go.Figure(go.Bar(x=corr_df['r'], y=corr_df.index, orientation='h', marker_color=colors))
-                fig.update_layout(height=300, margin=dict(l=40, r=40, t=40, b=40), xaxis_title="Hệ số tương quan Pearson (r)", paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
-                st.plotly_chart(fig, use_container_width=True)
-            else: st.warning("No correlation data.")
+# --- DATA & FILTERS ---
+# Constants
+MAJORS = {
+    "IT": "Công nghệ thông tin",
+    "Biz": "Kinh tế & Marketing",
+    "Design": "Thiết kế đồ họa",
+    "Tourism": "Du lịch – Nhà hàng – Khách sạn",
+}
+SEMESTERS = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+TEXT_WISHES = [
+    {"t": "Trường cần siết chặt hơn về đánh giá năng lực để cho điểm phù hợp.", "c": "Academic", "s": "Neutral"},
+    {"t": "Có nhiều cuộc thi hơn cho ngành CNTT để sinh viên thử sức với dự án thực tế.", "c": "Academic", "s": "Positive"},
+    {"t": "Ước gì học phí ít hơn.", "c": "Finance", "s": "Negative"},
+    {"t": "Lịch học bất tiện, khó chọn lớp vào giờ cao điểm, mong trường khắc phục.", "c": "Academic", "s": "Negative"},
+    {"t": "Mong có nhiều buổi thực hành tại doanh nghiệp và đi tour thực tế hơn.", "c": "Academic", "s": "Positive"},
+    {"t": "Cải thiện cơ sở vật chất, chất lượng giảng dạy và môi trường học tập.", "c": "Environment", "s": "Positive"},
+    {"t": "Wifi cần mạnh hơn và nên có thêm máy lọc nước cho sinh viên.", "c": "Environment", "s": "Negative"},
+    {"t": "Giảm deadline để sinh viên bớt áp lực.", "c": "Academic", "s": "Negative"},
+    {"t": "Tổ chức nhiều hoạt động tập thể và phát triển các câu lạc bộ.", "c": "Social", "s": "Positive"},
+    {"t": "Giảm học phí hoặc có nhiều chương trình học bổng hơn cho sinh viên.", "c": "Finance", "s": "Positive"},
+]
 
-def display_nlp_section(df, report):
-    with st.container(border=True):
-        st.markdown('<div class="section-title"><span class="icon">💬</span> Phân tích "Điều ước" của sinh viên (NLP)</div>', unsafe_allow_html=True)
+def main():
+    """Main function to run the Streamlit dashboard."""
+    if not _DATA_PATH.exists():
+        st.error(f"Data file not found: {_DATA_PATH}. Run the ETL pipeline in main.ipynb first.")
+        return
 
-        col1, col2 = st.columns([1.5, 1])
-        with col1:
-            st.markdown("<h6>Most Common Wishes (Word Cloud)</h6>", unsafe_allow_html=True)
-            text = ' '.join(df['wish'].dropna().astype(str))
-            if text:
-                try:
-                    # Make wordcloud background transparent to inherit container color
-                    wc = WordCloud(width=800, height=400, background_color=None, mode='RGBA', colormap='autumn').generate(word_tokenize(text, format="text"))
-                    st.image(wc.to_array(), use_container_width=True)
-                except Exception as e:
-                    st.warning(f"Could not generate word cloud: {e}")
-            else:
-                st.info("Không có dữ liệu 'điều ước' để phân tích.")
-        with col2:
-            st.markdown("<h6>Chủ đề được quan tâm hàng đầu</h6>", unsafe_allow_html=True)
-            top_wishes = report.get('wish_analysis', {})
-            if top_wishes:
-                # Display top keywords in a formatted way
-                html = '<div class="insight-box insight-box-blue"><div class="insight-title">Top Keywords</div><ul>'
-                for word, count in top_wishes.items():
-                    html += f"<li><b>{word.capitalize()}</b>: {count} lượt</li>"
-                html += "</ul></div>"
-                st.markdown(html, unsafe_allow_html=True)
-            else:
-                st.info("Không có từ khóa nổi bật nào được tìm thấy.")
+    # Mapping chuyên ngành (dùng chung cho filter và chart)
+    major_mapping = {
+        "Ngành Công Nghệ Thông Tin": "IT",
+        "Thiết kế đồ họa": "Design",
+        "Quản Trị Kinh Doanh & Marketing": "Biz",
+        "Du lịch – Nhà hàng – Khách sạn": "Tourism",
+        "Logistics & Y tế": "Biz",
+        "Công nghệ kỹ thuật – Cơ khí – Điện tử": "IT",
+        "Khác": "Biz",
+        "Ngôn ngữ": "Biz",
+    }
 
-# --- Main App Layout ---
-df_full = load_data()
+    # Load raw data CHO BIỂU ĐỒ (giữ nguyên cột gốc: dem_major, hap_*, aca_*, timestamp...)
+    raw_for_charts = pd.read_csv(_DATA_PATH)
+    raw_for_charts["major_key"] = raw_for_charts["dem_major"].map(major_mapping).fillna("IT")
+    raw_for_charts["semester_num"] = pd.to_numeric(raw_for_charts["dem_semester"], errors="coerce")
+    raw_for_charts = raw_for_charts.dropna(subset=["semester_num"])
+    raw_for_charts["semester_num"] = raw_for_charts["semester_num"].astype(int)
 
-# Use a container for the main content
-main_container = st.container()
+    raw_data = pd.read_csv(_DATA_PATH)
 
-# Sidebar MUST be defined before the main content that depends on its filters
-with st.sidebar:
-    st.markdown('<div class="sidebar-title"><div class="icon-bg">📊</div> FPOLY Analytics</div>', unsafe_allow_html=True)
-    if st.button("🔄 Cập nhật dữ liệu", use_container_width=True, type="primary"):
-        st.cache_data.clear()
-        st.rerun()
+    # Data Transformations (cho các component hiện tại)
+    raw_data.rename(columns={
+        "dem_major": "major",
+        "dem_semester": "semester",
+        "dem_gpa": "ahs",
+        "wish": "wish_text" # Rename original wish to wish_text to avoid conflict
+    }, inplace=True)
 
-    # --- Filters ---
-    if df_full is not None:
-        st.header("Filters")
-        # These widgets are the single source of truth for filtering
-        majors = st.multiselect("Chuyên ngành", df_full['dem_major'].unique(), default=df_full['dem_major'].unique())
-        semesters = st.multiselect("Kỳ học", sorted(df_full['dem_semester'].unique()), default=sorted(df_full['dem_semester'].unique()))
+    raw_data["major"] = raw_data["major"].map(major_mapping).fillna("IT")
+
+    # Convert semester to numeric, coercing errors to NaN
+    raw_data['semester'] = pd.to_numeric(raw_data['semester'], errors='coerce')
+    # Drop rows where semester is NaN after conversion
+    raw_data.dropna(subset=['semester'], inplace=True)
+    raw_data['semester'] = raw_data['semester'].astype(int)
+
+    # Create 'factors' dictionary column
+    def calculate_factors(row):
+        aca_cols = ["aca_curriculum_fit", "aca_deadline_pressure", "aca_teaching_quality", "aca_lms_stability"]
+        env_cols = ["env_facilities", "env_utilities", "env_dynamic_culture"]
+        soc_cols = ["soc_friendship_support", "soc_activity_integration", "soc_family_support"]
+        fin_cols = ["fin_tuition_value", "fin_living_cost_worry", "fin_job_prospects"]
+        hap_cols = ["hap_general_satisfaction", "hap_school_energy", "hap_meaningful_life", "hap_loyalty_choice"]
+
+        factors_dict = {
+            "aca": row[aca_cols].mean(),
+            "env": row[env_cols].mean(),
+            "soc": row[soc_cols].mean(),
+            "fin": row[fin_cols].mean(),
+            "hap": row[hap_cols].mean(),
+        }
+        return factors_dict
+
+    raw_data["factors"] = raw_data.apply(calculate_factors, axis=1)
+
+    # Create 'risk' column (randomly for now)
+    raw_data["risk"] = np.random.choice([0, 1], size=len(raw_data), p=[0.88, 0.12])
+
+    # Create 'wish' (text), 'wishCat', and 'wishSent' columns
+    # Assign 'wish_text' to 'wish' and randomly assign 'wishCat' and 'wishSent' from TEXT_WISHES
+    raw_data["wish"] = raw_data["wish_text"]
+    raw_data.drop(columns=["wish_text"], inplace=True) # Drop the temporary column
+
+    # Fill NaN values in 'wish' with an empty string to avoid errors with choices
+    raw_data['wish'].fillna('', inplace=True)
+
+    # Ensure all TEXT_WISHES categories are covered, or add a default
+    if not TEXT_WISHES:
+        st.error("TEXT_WISHES constant is empty. Cannot assign wish categories.")
+        # Provide a fallback if TEXT_WISHES is empty
+        raw_data["wishCat"] = "Unknown"
+        raw_data["wishSent"] = "Neutral"
     else:
-        # Create empty placeholders if data loading fails
-        majors = []
-        semesters = []
+        wish_choices = [(w["c"], w["s"]) for w in TEXT_WISHES]
+        # Use a more robust way to assign wishCat and wishSent
+        # For now, let's randomly assign or map them if a pattern is found
+        # Given the original TEXT_WISHES is a fixed list, let's just make it random for now
+        # until actual sentiment analysis or categorization is implemented.
+        random_choices = np.random.choice(len(wish_choices), size=len(raw_data))
+        raw_data["wishCat"] = [wish_choices[i][0] for i in random_choices]
+        raw_data["wishSent"] = [wish_choices[i][1] for i in random_choices]
 
-# --- Data Filtering and Analysis ---
-if df_full is not None:
-    df_filtered = df_full[df_full['dem_major'].isin(majors) & df_full['dem_semester'].isin(semesters)]
-    
-    if not df_filtered.empty:
-        # Run analysis on the filtered data
-        report = run_analysis(df_filtered)
-    else:
-        # Create an empty report if there's no data
-        report = {}
-else:
-    df_filtered = pd.DataFrame()
-    report = {}
+    # Drop original columns that are now aggregated into 'factors' or are no longer needed
+    columns_to_drop = [
+        "timestamp", "dem_residence",
+        "hap_general_satisfaction", "hap_school_energy", "hap_meaningful_life", "hap_loyalty_choice",
+        "aca_curriculum_fit", "aca_deadline_pressure", "aca_teaching_quality", "aca_lms_stability",
+        "env_facilities", "env_utilities", "env_dynamic_culture",
+        "soc_friendship_support", "soc_activity_integration", "soc_family_support",
+        "fin_tuition_value", "fin_living_cost_worry", "fin_job_prospects"
+    ]
+    raw_data.drop(columns=columns_to_drop, inplace=True, errors='ignore')
 
-# --- Dynamic Sidebar Content (after analysis) ---
-with st.sidebar:
-    st.markdown("---")
-    top_factor = report.get('top_correlated_factor')
-    if top_factor:
-        tip_message = f'''<div class="sidebar-info-box">💡 <b>Mẹo:</b> Nhóm <b>{top_factor}</b> đang có tương quan cao nhất tới mức độ hạnh phúc. Cần ưu tiên phân tích và tối ưu các yếu tố trong nhóm này.</div>'''
-    else:
-        tip_message = '''<div class="sidebar-info-box">💡 <b>Mẹo:</b> Chọn bộ lọc để xem phân tích chi tiết hoặc khi có đủ dữ liệu.</div>'''
-    st.markdown(tip_message, unsafe_allow_html=True)
+    # Initialize session state for filters
+    if "current_major" not in st.session_state:
+        st.session_state.current_major = "all"
+    if "current_semester" not in st.session_state:
+        st.session_state.current_semester = "all"
+    if "current_semester" not in st.session_state:
+        st.session_state.current_semester = "all"
 
+    def reset_filters():
+        st.session_state.current_major = "all"
+        st.session_state.current_semester = "all"
 
-# --- Main Content Display ---
-with main_container:
-    if df_full is not None:
-        st.header("Báo cáo Mức độ Hài lòng Sinh viên", divider="orange")
-        st.caption(f"Dữ liệu thực tế từ Google Form • Cập nhật lần cuối: {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}")
+    def filter_data(data):
+        df = data.copy()
+        if st.session_state.current_major != "all":
+            df = df[df["major"] == st.session_state.current_major]
         
-        if df_filtered.empty:
-            st.warning("Không có dữ liệu phù hợp với bộ lọc đã chọn.")
-        else:
-            display_kpis(report)
-            st.markdown('<div class="section-spacer"></div>', unsafe_allow_html=True)
-            display_charts(report)
-            st.markdown('<div class="section-spacer"></div>', unsafe_allow_html=True)
-            display_nlp_section(df_filtered, report)
+        semester_map = {
+            "freshman": (df["semester"] <= 3),
+            "junior": (df["semester"] >= 4) & (df["semester"] <= 6),
+            "senior": (df["semester"] >= 7)
+        }
+        if st.session_state.current_semester in semester_map:
+            df = df[semester_map[st.session_state.current_semester]]
+        
+        return df
+
+    def filter_raw_for_charts(data):
+        """Áp dụng cùng bộ lọc cho dữ liệu raw (có major_key, semester_num)."""
+        df = data.copy()
+        if st.session_state.current_major != "all":
+            df = df[df["major_key"] == st.session_state.current_major]
+        semester_map = {
+            "freshman": (df["semester_num"] <= 3),
+            "junior": (df["semester_num"] >= 4) & (df["semester_num"] <= 6),
+            "senior": (df["semester_num"] >= 7),
+        }
+        if st.session_state.current_semester in semester_map:
+            df = df[semester_map[st.session_state.current_semester]]
+        return df
+
+    # --- Render App ---
+    render_sidebar(reset_filters)
+    filtered_data = filter_data(raw_data)
+    filtered_raw_for_charts = filter_raw_for_charts(raw_for_charts)
+
+    if not filtered_data.empty:
+        st.header("📈 Biểu đồ Phân tích Chi tiết")
+        analyzer = DataAnalyzer(str(_DATA_PATH))
+        chart_data = analyzer.get_chart_data(df=filtered_raw_for_charts)
+        render_charts(chart_data, filtered_data=filtered_data)
     else:
-        st.error("Không thể tải dữ liệu. Vui lòng kiểm tra file `data/raw/fpoly_survey.csv`.")
+        st.warning("Không có dữ liệu cho bộ lọc đã chọn. Vui lòng thử lại.")
+
+if __name__ == "__main__":
+    main()

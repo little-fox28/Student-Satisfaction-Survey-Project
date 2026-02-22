@@ -3,7 +3,6 @@ class Config:
     COLUMN_MAPPING = {
         # Metadata
         'Dấu thời gian': 'timestamp',
-        'Tên người dùng': 'email',
         'Địa chỉ email': 'email',
         'Xác nhận đồng ý tham gia khảo sát:': 'consent',
 

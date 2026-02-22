@@ -1,7 +1,23 @@
 import pandas as pd
+import numpy as np
 from underthesea import word_tokenize
 from collections import Counter
 import os
+
+import statsmodels.api as sm
+
+# Mapping chuyên ngành tiếng Việt → mã ngắn cho biểu đồ
+MAJOR_LABELS = {
+    "Ngành Công Nghệ Thông Tin": "CNTT",
+    "Thiết kế đồ họa": "Thiết kế",
+    "Quản Trị Kinh Doanh & Marketing": "KT-Marketing",
+    "Du lịch – Nhà hàng – Khách sạn": "Du lịch",
+    "Logistics & Y tế": "Logistics",
+    "Công nghệ kỹ thuật – Cơ khí – Điện tử": "Cơ khí-Điện tử",
+    "Khác": "Khác",
+    "Ngôn ngữ": "Ngôn ngữ",
+}
+
 
 class DataAnalyzer:
     def __init__(self, file_path: str):
@@ -161,5 +177,153 @@ class DataAnalyzer:
         
         # Get top 5 most common keywords
         self.report['wish_analysis'] = dict(word_counts.most_common(5))
+
+    # ==================== CHART DATA COMPUTATION ====================
+    def get_chart_data(self, df=None):
+        """
+        Tính toán dữ liệu sẵn sàng cho biểu đồ.
+        Nếu df=None thì dùng self.df (đã load từ file).
+        Trả về dict với các key: major_dist, semester_dist, gpa_dist, residence_dist,
+        factor_by_major, semester_happiness, gpa_happiness, correlation_matrix,
+        response_trend, wish_word_counts, likert_dist.
+        """
+        data = df if df is not None else self.df
+        if data.empty:
+            return {}
+
+        out = {}
+        hap_cols = [c for c in data.columns if c.startswith('hap_')]
+        aca_cols = [c for c in data.columns if c.startswith('aca_')]
+        env_cols = [c for c in data.columns if c.startswith('env_')]
+        soc_cols = [c for c in data.columns if c.startswith('soc_')]
+        fin_cols = [c for c in data.columns if c.startswith('fin_')]
+        factor_cols = {'aca': aca_cols, 'env': env_cols, 'soc': soc_cols, 'fin': fin_cols, 'hap': hap_cols}
+
+        # 1. Phân bố theo ngành
+        if 'dem_major' in data.columns:
+            major_counts = data['dem_major'].value_counts()
+            out['major_dist'] = {MAJOR_LABELS.get(k, k): int(v) for k, v in major_counts.items()}
+
+        # 2. Phân bố theo kỳ học
+        if 'dem_semester' in data.columns:
+            sem_counts = data['dem_semester'].value_counts().sort_index()
+            out['semester_dist'] = {int(k): int(v) for k, v in sem_counts.items()}
+
+        # 3. Phân phối GPA (bins cho histogram)
+        if 'dem_gpa' in data.columns:
+            gpa = data['dem_gpa'].dropna()
+            out['gpa_dist'] = {
+                'values': gpa.tolist(),
+                'bins': [4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0],
+                'mean': float(gpa.mean()),
+            }
+
+        # 4. Phân bố nơi ở
+        if 'dem_residence' in data.columns:
+            res_counts = data['dem_residence'].value_counts()
+            out['residence_dist'] = res_counts.to_dict()
+
+        # 5. Điểm các nhân tố theo ngành
+        if 'dem_major' in data.columns and factor_cols['aca']:
+            individual_ahs = data[hap_cols].mean(axis=1) if hap_cols else None
+            factor_by_major = []
+            for maj in data['dem_major'].unique():
+                subset = data[data['dem_major'] == maj]
+                def safe_mean(cols):
+                    if not cols: return None
+                    v = subset[cols].mean().mean()
+                    return None if pd.isna(v) else round(float(v), 2)
+
+                row = {
+                    'major': MAJOR_LABELS.get(maj, maj),
+                    'aca': safe_mean(aca_cols),
+                    'env': safe_mean(env_cols),
+                    'soc': safe_mean(soc_cols),
+                    'fin': safe_mean(fin_cols),
+                    'hap': safe_mean(hap_cols),
+                    'count': int(len(subset)),
+                }
+                factor_by_major.append(row)
+            out['factor_by_major'] = factor_by_major
+
+        # 6. Đường cong hạnh phúc theo kỳ
+        if 'dem_semester' in data.columns and hap_cols:
+            data_copy = data.copy()
+            data_copy['_ahs'] = data_copy[hap_cols].mean(axis=1)
+            curve = data_copy.groupby('dem_semester')['_ahs'].mean().sort_index()
+            out['semester_happiness'] = {int(k): round(float(v), 2) for k, v in curve.items()}
+
+        # 7. Tương quan GPA - Hạnh phúc
+        if 'dem_gpa' in data.columns and hap_cols:
+            data_copy = data.copy()
+            data_copy['_ahs'] = data_copy[hap_cols].mean(axis=1)
+            gpa_bins = [0, 5.0, 6.5, 8.0, 10.0]
+            gpa_labels = ['<5.0', '5.0-6.5', '6.5-8.0', '>8.0']
+            data_copy['_gpa_group'] = pd.cut(
+                data_copy['dem_gpa'], bins=gpa_bins, labels=gpa_labels, right=False
+            )
+            gpa_hap = data_copy.groupby('_gpa_group', observed=False)['_ahs'].mean()
+            out['gpa_happiness'] = {str(k): round(float(v), 2) for k, v in gpa_hap.items()}
+            out['gpa_ahs_scatter'] = {
+                'gpa': data_copy['dem_gpa'].tolist(),
+                'ahs': data_copy['_ahs'].tolist(),
+            }
+
+        # 8. Ma trận tương quan
+        if hap_cols:
+            data_copy = data.copy()
+            data_copy['ahs'] = data_copy[hap_cols].mean(axis=1)
+            num_cols = aca_cols + env_cols + soc_cols + fin_cols + ['ahs']
+            num_cols = [c for c in num_cols if c in data_copy.columns]
+            if num_cols:
+                corr = data_copy[num_cols].corr()
+                out['correlation_matrix'] = {
+                    'columns': list(corr.columns),
+                    'matrix': corr.values.tolist(),
+                }
+
+        # 9. Xu hướng phản hồi theo thời gian
+        if 'timestamp' in data.columns:
+            data_copy = data.copy()
+            data_copy['timestamp'] = pd.to_datetime(data_copy['timestamp'], errors='coerce')
+            data_copy = data_copy.dropna(subset=['timestamp'])
+            if not data_copy.empty:
+                data_copy['_date'] = data_copy['timestamp'].dt.date
+                trend = data_copy.groupby('_date').size().reset_index(name='count')
+                trend['date'] = trend['_date'].astype(str)
+                out['response_trend'] = trend[['date', 'count']].to_dict('records')
+
+        # 10. Word cloud từ điều ước
+        if 'wish' in data.columns:
+            text = ' '.join(data['wish'].dropna().astype(str))
+            if text.strip():
+                tokens = word_tokenize(text.lower())
+                filtered = [t for t in tokens if t.isalpha() and t not in self.stopwords and len(t) > 2]
+                wc = Counter(filtered)
+                out['wish_word_counts'] = dict(wc.most_common(20))
+
+        # 11. Phân phối mức độ Likert (hap)
+        if hap_cols:
+            likert_data = []
+            for col in hap_cols:
+                for val, cnt in data[col].value_counts().sort_index().items():
+                    likert_data.append({'variable': col.replace('hap_', ''), 'level': int(val), 'count': int(cnt)})
+            out['likert_dist'] = likert_data
+
+        # 12. KPI tổng hợp
+        if hap_cols:
+            ahs_all = data[hap_cols].mean(axis=1)
+            promoters = int((ahs_all >= 4).sum())
+            detractors = int((ahs_all <= 2).sum())
+            total = len(data)
+            out['kpi'] = {
+                'ahs_overall': round(float(ahs_all.mean()), 2),
+                'nhs_pct': round((promoters - detractors) / total * 100, 1) if total > 0 else 0,
+                'total': total,
+                'promoters': promoters,
+                'detractors': detractors,
+            }
+
+        return out
 
         
